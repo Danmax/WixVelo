@@ -1,0 +1,129 @@
+import { createRecordsWrapper, getNameBasedOnPhone } from 'backend/salesforce-wrapper.jsw';
+
+$w.onReady(function () {
+    registerHandlers();
+
+});
+
+function registerHandlers() {
+    $w('#btnRegister').onClick(() => createRecordsHandler());
+    $w('#btnLookupPhone').onClick(() => queryRecordsHandler());
+    $w('#closeMsgBtn').onClick(() => closeMsgBox());
+}
+
+async function queryRecordsHandler() {
+    if (!$w('#txtMessage').collapsed) {
+        closeMsgBox();
+    }
+    $w('#loader').expand();
+    try {
+        const phone = $w('#imptLookupPhone').value;
+        const res = await getNameBasedOnPhone(phone);
+        const len = res.result.totalSize
+        if(len > 1 ){ 
+            const records= res.result.records 
+            console.log(records)
+            const recOptions =[] 
+            for(let i=0 ; i<len ; i++) {
+                let name = records[i].Name
+                let email = records[i].Email
+                let id = records[i].Id
+                let option =  {'label':`${name} ${email}`, 'value':`${id}`}
+                
+                recOptions.push(option)
+            }
+            
+            $w('#selectUser').options = recOptions
+            $w('#selectUser').show()
+            $w('#selectUser').expand()
+
+            $w('#selectUser').onChange((event) =>{ 
+               let userId = event.target.value;
+                showExecutionMsg(`Phone # ${phone} found ${len} records.\n  ID: ${userId}`);
+            })
+            
+            console.log(recOptions)
+         }
+        else{
+        const record = res.result.records[0]
+        const name = record.Name
+        const email = record.Email
+        const id = record.Id
+
+        console.log(res)
+        showExecutionMsg(`Phone # ${phone} found ${len} records.\n User ${name} email: ${email} ID: ${id}`);
+        }
+    } catch (err) {
+        showExecutionMsg(err.toString());
+    }
+    $w('#loader').collapse();
+}
+
+async function createRecordsHandler() {
+    const firstName = $w('#iptFirstName').value;
+    const lastName = $w('#iptLastName').value;
+    const phone = $w('#iptPhone').value;
+    const email = $w('#iptEmail').value;
+    const MailingPostalCode = $w('#iptZip').value;
+    const Current_Living_Arrangements__c = $w('#iptLivingConditions').value;
+    const Primary_Language__c = $w('#iptPrimaryLanguage').value;
+    const Ethnicity__c = $w('#iptEthnicity').value;
+    const Number_of_Household_Under_18__c = $w('#minors').value;
+    const Total_Household__c = $w('#totalHousehold').value;
+
+    if (firstName && phone) {
+        try {
+            const res = await createRecordsWrapper({ firstName, lastName, phone, email, MailingPostalCode, Current_Living_Arrangements__c, Primary_Language__c, Ethnicity__c, Number_of_Household_Under_18__c, Total_Household__c });
+            $w('#iptFirstName').value = '';
+            $w('#iptFirstName').resetValidityIndication()
+            $w('#iptLastName').value = '';
+            $w('#iptLastName').resetValidityIndication()
+            $w('#iptPhone').value = '';
+            $w('#iptPhone').resetValidityIndication()
+            $w('#iptEmail').value = '';
+            $w('#iptEmail').resetValidityIndication()
+            $w('#iptZip').value = '';
+            $w('#iptZip').resetValidityIndication()
+            $w('#iptLivingConditions').value = '';
+            $w('#iptLivingConditions').resetValidityIndication()
+            $w('#iptPrimaryLanguage').value = '';
+            $w('#iptPrimaryLanguage').resetValidityIndication()
+            $w('#iptEthnicity').value = '';
+            $w('#iptEthnicity').resetValidityIndication()
+            $w('#minors').value = '';
+            $w('#minors').resetValidityIndication()
+            $w('#totalHousehold').value = '';
+            $w('#totalHousehold').resetValidityIndication()
+
+            if (res) {
+                showMsg('Your record was added.');
+            } else {
+                showMsg('Error: Your record was not added.');
+            }
+        } catch (err) {
+            showMsg(err.toString());
+        }
+    } else {
+        showMsg('Please provide your name and then click the Add button again.')
+    }
+}
+
+function showMsg(msg) {
+    $w('#txtMessage').text = msg;
+    $w('#txtMessage').expand()
+}
+
+function showExecutionMsg(msg) {
+    $w('#msgText').text = msg;
+    $w('#msgText').expand();
+    $w('#closeMsgBtn').expand();
+}
+
+function closeMsgBox() {
+    $w('#msgText').collapse();
+    $w('#closeMsgBtn').collapse();
+}
+
+export function closeMsgBtn_click(event) {
+closeMsgBox()
+}
