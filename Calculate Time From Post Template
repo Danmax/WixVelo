@@ -1,0 +1,257 @@
+
+// Version v.1.0.2 fixed image post with uploadFiles() latest API on 20210628 by DEM
+// Version v.1.0.3 : 20210630 by DEM
+    // Display #Hashtags to Posted Notes up to 5 # -- Done --
+    // posted date -- Done --
+    // display user info -- Done --
+    // fixed page refresh on new note submit
+    // fixed reset form and reset validation notice on note save
+
+    // New Issues  
+
+    // Page does not save or load new items on non logged in users
+
+// Upcomming updates
+
+// Rename uploaded photo?
+// Next Feature to Add Heart Count on click button function 
+// when clicked by logged in user it increases the count by one. One vote per user.
+// Sharing Feature
+// user posts, gallery, profile
+// Select from event overlays for image.
+
+import wixData from 'wix-data';
+import wixUsers from 'wix-users';
+let photoURL
+let userId = wixUsers.currentUser.id;
+
+$w.onReady(function () {
+    
+    loadNotes()
+
+})
+
+function loadNotes() {
+
+    // Learn to Export this funtion into Add on feature.
+    $w("#CommentsRead").onReady(() => {
+        
+        $w("#CommentsList").forEachItem(($item, itemData, index) => {
+            
+            let createdDate = new Date(itemData._createdDate)
+            let today = new Date()
+            let created
+
+            function getDifferenceInMinutes(createdDate, today) {
+                const diffInMs = Math.abs(today - createdDate);
+                created = (diffInMs / (1000))
+                if (created < 1) {
+                    created =Math.floor(created)
+                    return (`${created} SECONDS AGO`)
+                }
+                if (created < 60 * 60) {
+                    created = Math.floor(created /60)
+                    if(created < 2){
+                        return (`${created} MINUTE AGO`)
+                    }
+                    return (`${created} MINUTES AGO`)
+                }
+                if (created < 60 * 60* 24 ) {
+                    created = Math.floor(created / 60 / 60 )
+                    if(created < 2){ 
+                        return (`${created} HOUR AGO`)
+                    }
+                    return (`${created} HOURS AGO`)
+
+                } 
+                if (created < 60 * 60 *24 * 7) {
+                    created = Math.floor(created / 60 / 60 / 24)
+                    if(created < 2){
+                    return (`${created} DAY AGO`)
+                    }
+                    return (`${created} DAYS AGO`)
+                }
+                if (created < 60 * 60 *24 * 365) {
+                    created = Math.floor(created / 60 / 60 / 24)
+                    const options = { month: 'long', day: '2-digit' }; 
+                    return (`${createdDate.toLocaleString('en-US' , options)}`)
+                } 
+                else {
+                    const options = { year: '4-digit', month: 'short', day: '2-digit' };
+                    return (`${createdDate.toLocaleString('en-US' , options)}`)
+
+                }
+
+            }
+            const createdDateString = getDifferenceInMinutes(createdDate, today);
+
+            $item('#txtPostTitle').text = itemData.title
+            $item('#txtPostNote').text = itemData.comment
+            $item('#createdDate').text = createdDate.toDateString()
+            $item('#postDisplayImage').src = itemData.photo
+            //$item('#postDisplayImage').fitMode = "fixedWidth"
+            $item('#postDisplayImage').fitMode = 'fit'
+            $item('#likeCount').text = itemData.hearts.toString()
+            //  
+            $item('#createdDate').text = createdDateString
+
+            if (itemData.memberId) {
+                const { memberId: { name, picture, contactId } } = itemData
+
+                const userProfile = {
+                    'contactId': contactId,
+                    'name': name,
+                    'picture': picture
+                }
+                
+                $item('#proName').text = name
+                $item('#proName').show()
+                $item('#proImage').src = picture
+                $item('#proImage').show()
+            }
+            const { hashtags } = itemData
+            const tagsArray = []
+            if (hashtags) {
+                hashtags.forEach(formatObject)
+            }
+
+            function formatObject(tag, index) {
+
+                const options = { 'label': tag, 'value': tag }
+                tagsArray.push(options)
+
+            }
+
+            if (tagsArray) {
+                $item('#displayHashtags').options = tagsArray
+                $item('#displayHashtags').show()
+            }
+
+        })
+
+    })
+}
+
+$w('#btnRefresh').onClick(() => {
+    
+    setTimeout(refreshDB, 1000)
+})
+
+function refreshDB(){
+        
+  $w("#CommentsRead").onReady( () => {
+    $w("#CommentsRead").refresh()
+      .then( () => {
+          loadNotes()
+        
+      } );
+  } );
+
+    }
+export function uploadPhoto_change(event) {
+    const files = $w("#uploadPhoto").value;
+    $w("#uploadPhoto").fileType = "Image";
+    $w('#btnAddPhoto').enable()
+    $w('#btnAddPhoto').onClick(() => {
+        if (files.length > 0) { // Site visitor chose files
+            photoURL
+            $w("#uploadPhoto").uploadFiles()
+                .then((uploadedFiles) => {
+                    uploadedFiles.forEach(uploadedFile => {
+                        photoURL = uploadedFile.fileUrl
+                        $w("#preview").src = photoURL
+                        $w("#preview").show();
+
+                    })
+
+                    $w("#txtFileName").text = "Upload successful.";
+                    $w("#txtFileName").show();
+
+                })
+                .catch((uploadError) => {
+                    $w("#txtFileName").text = "File upload error: " + uploadError.errorCode;
+
+                });
+        } else { // Site visitor clicked button but didn't choose any files
+            $w("#txtFileName").text = "Please choose a file to upload."
+            $w("#txtFileName").show()
+        }
+    });
+}
+
+async function createNote() {
+    try {
+        let user = wixUsers.currentUser;
+        if (user) {
+            $w('#CommentsWrite').setFieldValue('memberId', user.id);
+        }
+        $w('#CommentsWrite').setFieldValue('title', $w("#iptTitle").value);
+        $w('#CommentsWrite').setFieldValue('comment', $w("#iptComment").value);
+        $w('#CommentsWrite').setFieldValue('hashtags', $w("#hashtags").value);
+        $w('#CommentsWrite').setFieldValue('hearts', 0);
+        if (photoURL) { $w('#CommentsWrite').setFieldValue('photo', photoURL); }
+        $w('#CommentsWrite').save()
+            .then((newNote) => {
+
+                $w("#txtMessage").text = "Your post was created!"
+                $w("#txtMessage").show()
+                setTimeout(clearValues, 3000)
+                
+                refreshDB()
+
+            })
+    } catch (err) {
+        $w("#txtMessage").text = `error occured : ${err}`;
+        $w("#txtMessage").show();
+    }
+
+}
+
+function findHashtags() {
+    let regExHash = /(#[a-zA-Z0-9]*\b)/gm;
+    let hashtags = regExHash.exec($w("#iptComment").value);
+
+    let tagsArray = [];
+    while (hashtags) {
+        let tags = hashtags[1];
+        tags = tags.substring(0, 19);
+        let toInsert = { "label": tags, "value": tags }
+        tagsArray.push(toInsert);
+        hashtags = regExHash.exec($w("#iptComment").value);
+        if (tagsArray.length >= 5) { break; }
+        
+
+    }
+    if (tagsArray.length > 0) {
+        $w("#hashtags").options = tagsArray;
+        $w("#hashtags").selectedIndices = Array.from(Array(tagsArray.length).keys());
+        $w("#hashtags").show("fade", { "duration": 500, "delay": 0 })
+    } else {
+        $w("#hashtags").options = [];
+        $w("#hashtags").hide("fade", { "duration": 500, "delay": 0 })
+    }
+
+}
+
+export function iptComment_keyPress(event) {
+    clearTimeout();
+    setTimeout(findHashtags, 1000)
+}
+
+export function btnSubmit_click(event) {
+    createNote();
+
+}
+
+function clearValues() {
+    $w("#uploadPhoto").reset();
+    $w("#iptTitle").value = "";
+    $w("#iptTitle").resetValidityIndication()
+    $w("#iptComment").value = "";
+    $w("#hashtags").options = [];
+    $w("#preview").hide()
+    $w('#btnAddPhoto').disable()
+    $w("#txtMessage").hide()
+    
+
+}
